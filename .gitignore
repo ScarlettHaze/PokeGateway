@@ -16,3 +16,6 @@ server-chain.crt
 gt5.key
 gt5.crt
 *.srl
+
+# Build artifacts / deliverables
+*.tar.gz
