@@ -71,10 +71,14 @@ class NAS:
         token = self.db.create_authtoken(post)
         ret = {"retry": "0", "returncd": "007", "statusdata": "Y"}
         svc = post.get("svc", "")
+        log.info("NAS svcloc: svc=%s gamecd=%s", svc, post.get("gamecd"))
         if svc in ("9000", "9001"):
-            # svc 9000/9001 is the download server (Mystery Gift).
+            # svc 9000/9001 is the download server (Mystery Gift / DLS1).
             ret["svchost"] = self.public_host or "dls1.nintendowifi.net"
-            ret["token" if svc == "9000" else "servicetoken"] = token
+            # Provide the credential under both field names: different games
+            # (and generations) read it as "token" or "servicetoken".
+            ret["token"] = token
+            ret["servicetoken"] = token
         else:
             ret["svchost"] = "n/a"
             ret["servicetoken"] = token
