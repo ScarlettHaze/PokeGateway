@@ -55,14 +55,24 @@ EOF
     fi
 fi
 
-# 2. NAS/DLS1 server certificate: 1024-bit RSA, CN=*.*.*, SHA-1, signed by
-#    the NWC certificate. (The DS supports nothing newer than RSA-1024/SHA-1.)
+# 2. Server certificate for all the HTTPS hosts the DS contacts: 1024-bit
+#    RSA, SHA-1, signed by the NWC certificate. (The DS supports nothing
+#    newer than RSA-1024/SHA-1.)
+#
+#    The DS matches the certificate name label-for-label, with '*' matching
+#    one label. CN=*.*.* only covers 3-label hosts (nas.nintendowifi.net),
+#    so GTS (gamestats2.gs.nintendowifi.net, 4 labels) and pkvldtprod
+#    (pkvldtprod.nintendo.co.jp, 4 labels) would fail. We add SANs covering
+#    3-, 4- and 5-label hosts plus the specific domains.
 if [[ ! -f server.key ]]; then
     openssl genrsa -out server.key 1024 2>/dev/null
 fi
+cat > san.ext <<'EOF'
+subjectAltName=DNS:*.*.*,DNS:*.*.*.*,DNS:*.*.*.*.*,DNS:*.nintendowifi.net,DNS:*.gs.nintendowifi.net,DNS:*.available.gs.nintendowifi.net,DNS:*.master.gs.nintendowifi.net,DNS:*.nintendo.co.jp,DNS:*.pokemon-gl.com,DNS:nintendowifi.net
+EOF
 openssl req -new -key server.key -subj "/CN=*.*.*" -out server.csr
 openssl x509 -req -in server.csr -CA NWC.crt -CAkey NWC.key -CAcreateserial \
-    -sha1 -days 3650 -out server.crt 2>/dev/null
+    -sha1 -days 3650 -extfile san.ext -out server.crt 2>/dev/null
 cat server.crt NWC.crt > server-chain.crt
 
 # 3. Gen 5 Global Terminal certificate: self-signed, not validated by the game.

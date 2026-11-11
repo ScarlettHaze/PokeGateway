@@ -20,3 +20,5 @@ gt5.crt
 # Build artifacts / deliverables
 *.tar.gz
 stunnel-host.conf
+certs/san.ext
+san.ext
