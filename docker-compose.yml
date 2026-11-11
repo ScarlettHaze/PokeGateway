@@ -1,0 +1,18 @@
+# Host networking keeps the real client addresses visible to the
+# matchmaking and NAT negotiation servers, which they need.
+services:
+  pokegateway:
+    build: .
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./dlc:/app/dlc
+      - ./config.ini:/app/config.ini:ro
+
+  sslproxy:
+    build: deploy/sslproxy
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./certs:/certs:ro
