@@ -131,9 +131,17 @@ class DLS1:
         if req.method != "POST":
             return Response(404, b"")
         post = nas_decode_form(req.body)
+        log.info("DLS1 request: action=%s gamecd=%s rhgamecd=%s attr1=%s attr2=%s attr3=%s "
+                 "contents=%s num=%s offset=%s", post.get("action"), post.get("gamecd"),
+                 post.get("rhgamecd"), post.get("attr1"), post.get("attr2"),
+                 post.get("attr3"), post.get("contents"), post.get("num"), post.get("offset"))
         path = self._dir(post.get("gamecd", ""))
         if path is None:
+            log.warning("DLS1: refusing bad/unknown gamecd %r", post.get("gamecd"))
             return Response(403, b"")
+        if not os.path.isdir(path):
+            log.warning("DLS1: no gift folder for gamecd %r (looked in %s)",
+                        post.get("gamecd"), path)
         action = post.get("action", "").lower()
         headers = {"X-DLS-Host": "http://127.0.0.1/"}
 

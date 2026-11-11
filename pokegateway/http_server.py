@@ -19,6 +19,20 @@ REASONS = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found",
            405: "Method Not Allowed", 500: "Internal Server Error"}
 
 
+def _preview(data: bytes, limit: int = 256) -> str:
+    """Readable preview of a request/response body for debug logs."""
+    if not data:
+        return "(empty)"
+    chunk = data[:limit]
+    try:
+        text = chunk.decode("ascii")
+        if all(32 <= ord(c) < 127 or c in "\r\n\t" for c in text):
+            return repr(text) + ("..." if len(data) > limit else "")
+    except UnicodeDecodeError:
+        pass
+    return chunk.hex() + ("..." if len(data) > limit else "")
+
+
 @dataclass
 class Request:
     method: str
@@ -91,6 +105,10 @@ class HTTPServer:
             log.debug("Bad request from %s: %r", peer[0], exc)
             writer.close()
             return
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(">>> %s %s%s from %s\n    headers=%s\n    body(%d)=%s",
+                      req.method, req.host, req.path, req.client_ip, dict(req.headers),
+                      len(req.body), _preview(req.body))
         try:
             resp = await self.app(req)
         except Exception:
@@ -98,6 +116,9 @@ class HTTPServer:
             resp = Response(500, b"Server error")
         log.info("%s %s%s -> %d (%d bytes) [%s]", req.method, req.host, req.path,
                  resp.status, len(resp.body), req.client_ip)
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("<<< %d headers=%s body(%d)=%s", resp.status, resp.headers,
+                      len(resp.body), _preview(resp.body))
         try:
             writer.write(resp.encode())
             await writer.drain()
