@@ -58,6 +58,22 @@ starts, it logs the IP your DS should use as its DNS server. On the DS
 The DS only supports open or WEP Wi-Fi networks. A DSi or 3DS running a
 DS game has the same limit.
 
+### macOS
+
+Docker on macOS runs in a VM, so the container's host networking can't be
+reached by a DS on your LAN. Instead run PokeGateway natively (ports land on
+the Mac's real IP) with only the SSL proxy in a container:
+
+```bash
+./start-macos.sh
+```
+
+It binds to your Mac's LAN IP, generates certs if needed, builds and starts
+the SSL-proxy container (ports 443 and 12401 pointed back at the native
+server), then runs PokeGateway under `sudo` (needed for ports 53 and 80).
+This is the setup verified to log a real DS in. Point the DS's DNS at the IP
+it prints. Global Link / Dream World (pokemon-gl.com) is not implemented.
+
 ### Docker (one command)
 
 Put your Wii NWC certificate material in `certs/` first (either
