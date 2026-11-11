@@ -1,7 +1,9 @@
-"""Minimal asyncio HTTP/1.0-1.1 server.
+"""Minimal asyncio HTTP server.
 
 The DS speaks very simple HTTP, so this deliberately avoids third-party
-dependencies. Every response closes the connection.
+dependencies. Responses are always HTTP/1.0 and close the connection: the
+DS's download (DLS1) client fails with "A communication error has
+occurred" when it receives an HTTP/1.1 response.
 """
 
 import asyncio
@@ -49,7 +51,7 @@ class Response:
         headers = {"Content-Type": "text/plain", **self.headers}
         headers["Content-Length"] = str(len(self.body))
         headers["Connection"] = "close"
-        lines = ["HTTP/1.1 %d %s" % (self.status, REASONS.get(self.status, "Unknown"))]
+        lines = ["HTTP/1.0 %d %s" % (self.status, REASONS.get(self.status, "Unknown"))]
         lines += ["%s: %s" % (k, v) for k, v in headers.items()]
         return ("\r\n".join(lines) + "\r\n\r\n").encode("latin-1") + self.body
 

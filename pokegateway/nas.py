@@ -72,7 +72,8 @@ class NAS:
         ret = {"retry": "0", "returncd": "007", "statusdata": "Y"}
         svc = post.get("svc", "")
         if svc in ("9000", "9001"):
-            ret["svchost"] = (self.public_host or req.host or "n/a")
+            # svc 9000/9001 is the download server (Mystery Gift).
+            ret["svchost"] = self.public_host or "dls1.nintendowifi.net"
             ret["token" if svc == "9000" else "servicetoken"] = token
         else:
             ret["svchost"] = "n/a"

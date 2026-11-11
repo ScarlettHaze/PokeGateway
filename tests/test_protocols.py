@@ -6,7 +6,6 @@ import socket
 import struct
 import sys
 import tempfile
-import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -242,19 +241,54 @@ class GTSTest(Base):
 
 
 class DLS1Test(Base):
-    def test_listing_and_download(self):
-        os.makedirs(os.path.join(self.tmp, "dlc", "IPKE"))
-        with open(os.path.join(self.tmp, "dlc", "IPKE", "gift.myg"), "wb") as fh:
-            fh.write(b"WONDERCARD")
+    def post(self, **kw):
+        body = nas_encode_form(kw).strip()
+        return self.http("/download", body=body, method="POST", host="dls1.nintendowifi.net")
 
-        def post(**kw):
-            body = nas_encode_form(kw).strip()
-            return self.http("/download", body=body, method="POST", host="dls1.nintendowifi.net")
-        self.assertEqual(post(action="count", gamecd="IPKE").body, b"1")
-        self.assertIn(b"gift.myg", post(action="list", gamecd="IPKE").body)
-        self.assertEqual(post(action="contents", gamecd="IPKE", contents="gift.myg").body,
-                         b"WONDERCARD")
-        self.assertEqual(post(action="contents", gamecd="../etc", contents="x").status, 403)
+    def write(self, gamecd, files, list_txt=None):
+        d = os.path.join(self.tmp, "dlc", gamecd)
+        os.makedirs(d, exist_ok=True)
+        for name, data in files.items():
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(data)
+        if list_txt is not None:
+            with open(os.path.join(d, "_list.txt"), "w") as fh:
+                fh.write(list_txt)
+
+    def login_token(self, devtime):
+        return self.nas({"action": "login", "userid": "0000000000002", "gsbrcd": "IPGEabc",
+                         "devtime": devtime})["token"]
+
+    def test_gen4_one_gift_picked_by_ds_date(self):
+        # HeartGold (IPKE) falls back to SoulSilver's folder, as in DLS1-Files.
+        self.write("IPGE", {"a.myg": b"A" * 936, "b.myg": b"B" * 936, "c.myg": b"C" * 936},
+                   "a.myg\t\t\t\t\t936\r\nb.myg\t\t\t\t\t936\r\nc.myg\t\t\t\t\t936\r\n")
+        self.assertEqual(self.post(action="count", gamecd="IPKE").body, b"1")
+        token = self.login_token("260102120000")      # 2 January -> day 2 -> index 1
+        listing = self.post(action="list", gamecd="IPKE", token=token).body
+        self.assertEqual(listing, b"b.myg\t\t\t\t\t936\r\n")
+        self.assertEqual(self.post(action="contents", gamecd="IPKE", contents="b.myg").body,
+                         b"B" * 936)
+        self.assertEqual(self.post(action="contents", gamecd="../etc", contents="x").status, 403)
+
+    def test_gen5_mystery_gift_filtered_by_game(self):
+        lines = ("bw_only.bin\t\tMYSTERY_E\t300000\t\t720\r\n"
+                 "b2w2_only.bin\t\tMYSTERY_E\tC00000\t\t720\r\n"
+                 "french.bin\t\tMYSTERY_F\tF00000\t\t720\r\n"
+                 "PWT_custom_E.bin\tTITLE\tWBT_E\t\t\t55540\r\n")
+        self.write("IRAO", {"bw_only.bin": b"1" * 720, "b2w2_only.bin": b"2" * 720,
+                            "french.bin": b"3" * 720, "PWT_custom_E.bin": b"P"}, lines)
+        token = self.login_token("260101000000")
+        # Black 2 (rhgamecd IREO) sees only the B2W2 English gift.
+        args = dict(gamecd="IRAO", rhgamecd="IREO", attr1="MYSTERY_E", token=token)
+        self.assertEqual(self.post(action="count", **args).body, b"1")
+        self.assertTrue(self.post(action="list", **args).body.startswith(b"b2w2_only.bin\t"))
+        # White (IRBO) sees only the BW English gift.
+        args["rhgamecd"] = "IRBO"
+        self.assertTrue(self.post(action="list", **args).body.startswith(b"bw_only.bin\t"))
+        # PWT tournaments use the normal attribute listing.
+        pwt = self.post(action="list", gamecd="IRAO", rhgamecd="IREO", attr1="WBT_E").body
+        self.assertTrue(pwt.startswith(b"PWT_custom_E.bin\tTITLE\tWBT_E"))
 
 
 class FakeWriter:
@@ -493,7 +527,6 @@ class ServersStartTest(unittest.TestCase):
     """Boot every listener on ephemeral ports and talk to a few over sockets."""
 
     def test_boot(self):
-        from pokegateway import __main__ as main_mod  # noqa: F401
         from pokegateway import dns_server, gpcm, http_server, matchmaking, natneg
 
         async def go():

@@ -28,7 +28,7 @@ resolver. It is pure Python 3.10+ with no dependencies.
 | Battle Videos: upload, search, watch, save | pkgdsprod.nintendo.co.jp | 12400 | Pt / HGSS | ✅ |
 | Dress-up photos, Box uploads | pkgdsprod.nintendo.co.jp | 12400 | Pt / HGSS | ✅ |
 | Battle Videos, Musical photos | pkgdsprod.nintendo.co.jp | 12401 → 12411 | BW / B2W2 | ✅ (needs SSL proxy) |
-| Wi-Fi Mystery Gift downloads (DLS1) | dls1.nintendowifi.net | 80 | all | ✅ (put files in `dlc/<GAMECODE>/`) |
+| Wi-Fi Mystery Gift downloads (DLS1), B2W2 PWT tournament downloads | dls1.nintendowifi.net | 443 → 80 | all | ✅ (see [Wi-Fi Mystery Gift](#wi-fi-mystery-gift)) |
 | Wi-Fi Plaza web calls (schedule, questionnaire, VIPs, profile) | gamestats2 | 80 | Pt / HGSS | ⚠️ partial: the Plaza's IRC chat server (peerchat) is not implemented |
 | Trainer Rankings | pkgdsprod | 12400 | Pt / HGSS | ❌ not implemented (shows an error in-game) |
 | Game Sync / Pokémon Global Link / Dream World | pokemon-gl.com | 443 | Gen 5 | ❌ not implemented (redirected so it fails cleanly) |
@@ -78,38 +78,78 @@ negotiation servers see real client addresses.
 
 ## SSL certificates
 
-The DS logs in over HTTPS to `nas.nintendowifi.net`, and Gen 5 opens an
-SSL connection to `pkgdsprod.nintendo.co.jp:12401`. The DS only supports
-**SSLv3 with RC4**. Modern OpenSSL, and therefore Python, refuses to use
-that, so `deploy/sslproxy` builds nginx against OpenSSL 1.0.2 with those
-ciphers enabled. The proxy forwards:
+The DS logs in over HTTPS (`nas.nintendowifi.net`), downloads Mystery
+Gifts over HTTPS (`dls1.nintendowifi.net`), and Gen 5 opens an SSL
+connection to `pkgdsprod.nintendo.co.jp:12401`. The DS only supports
+**SSLv3 with RC4-SHA/RC4-MD5**. Modern OpenSSL, and therefore Python,
+refuses to use that. `deploy/sslproxy` builds stunnel against an OpenSSL
+1.1.1 that is patched to allow it, and it handles two DS quirks: the DS
+never sends `close_notify`, and it can't handle the empty-fragment
+countermeasure. This follows the setup tested on real hardware by
+[NDS-pokemon-mystery-gift-distribution](https://github.com/FreakedOutGamer/NDS-pokemon-mystery-gift-distribution).
+The proxy forwards:
 
-* `443` to `127.0.0.1:80` (NAS and pkvldtprod)
+* `443` to `127.0.0.1:80` (NAS, DLS1, pkvldtprod)
 * `12401` to `127.0.0.1:12411` (Gen 5 Global Terminal)
+
+The build and the forwarding have been tested with an SSLv3/RC4-SHA
+client: NAS login, a Gen 5 Mystery Gift download and a Gen 5 Global
+Terminal request all go through it. They have not been tested with a DS.
 
 Put these files in `./certs`:
 
+* `server-chain.crt` / `server.key`: the certificate the DS checks for
+  NAS/DLS1. The DS has a known flaw ("nds-constrain't"): it doesn't check
+  whether an intermediate certificate may sign others. So a certificate
+  signed with the Wii's NWC client certificate, which Nintendo's CA signed,
+  is accepted. You need that certificate and key, e.g. dumped from your own
+  Wii (`NWC.crt` / `NWC.key`). Then:
+  ```bash
+  openssl genrsa -out certs/server.key 1024
+  ```
+  ```bash
+  openssl req -new -key certs/server.key -subj "/CN=*.*.*" -out certs/server.csr
+  ```
+  ```bash
+  openssl x509 -req -in certs/server.csr -CA NWC.crt -CAkey NWC.key -CAcreateserial -sha1 -days 3650 -out certs/server.crt
+  ```
+  ```bash
+  cat certs/server.crt NWC.crt > certs/server-chain.crt
+  ```
+  The key must be 1024-bit RSA and the signature SHA-1, because the DS
+  supports nothing newer.
 * `gt5.crt` / `gt5.key`: any certificate. The game does not validate it:
   ```bash
   openssl req -x509 -newkey rsa:1024 -nodes -days 3650 -subj "/CN=pkgdsprod.nintendo.co.jp" -keyout certs/gt5.key -out certs/gt5.crt
   ```
-* `nas.crt` / `nas.key`: a certificate for `nas.nintendowifi.net` that the
-  DS accepts. The DS checks that the chain ends at Nintendo's CA, but it
-  has a known flaw: it accepts a leaf certificate signed by the Wii's NWC
-  client certificate. The usual approach, used by the AltWFC/Wiimmfi
-  projects, is to sign your own `nas.nintendowifi.net` certificate with
-  the NWC certificate and key dumped from **your own** Wii. Then put
-  `leaf + NWC cert` in `nas.crt`. That certificate can't be shipped here.
 
-If you only want to test without the DS, NAS also answers over plain HTTP
-on port 80.
+If you only want to test without the DS, NAS and DLS1 also answer over
+plain HTTP on port 80.
 
 ## Wi-Fi Mystery Gift
 
-Put the event files in `dlc/<GAMECODE>/`, for example
-`dlc/IPKE/myevent.myg` for HeartGold (US). Every file in that folder is
-offered. To control attribute filtering, add a `_list.txt` file with
-`name<TAB><TAB>attr1<TAB>attr2<TAB>attr3<TAB>size` lines.
+The `dlc/` folder uses the same layout as
+[InternalLoss/DLS1-Files](https://github.com/InternalLoss/DLS1-Files), the
+collection Wiimmfi serves. You can copy its game-code folders straight in,
+`_list.txt` files included:
+
+* **Gen 4** (`ADA*` Diamond/Pearl, `CPU*` Platinum, `IPG*`
+  HeartGold/SoulSilver): 936-byte `.myg` files. The game takes one gift
+  per connection. Which one depends on the **DS's date**: day of year,
+  modulo the number of gifts. To choose a gift, change the DS clock. Pearl
+  (`APA*`) and HeartGold (`IPK*`) fall back to the Diamond and SoulSilver
+  folders.
+* **Gen 5**: every BW/B2W2 cartridge sends the shared code `IRAO`
+  (international), `IRAJ` or `IRAK`. Gifts are 720-byte `.bin` files
+  listed in `_list.txt` as
+  `name<TAB><TAB>MYSTERY_<lang><TAB><game mask><TAB><TAB>size`. The game
+  mask is hex: 100000 Black, 200000 White, 400000 White 2, 800000 Black 2.
+  Each game is only offered gifts with its bit set, picked by date as in
+  Gen 4. The same folders also hold B2W2 downloadable PWT tournaments
+  (`WBT_<lang>` entries), which are listed normally.
+
+Without a `_list.txt`, every file in the folder is offered with blank
+attributes. That is fine for Gen 4, but Gen 5 needs the attributes.
 
 ## Matchmaking game keys
 
@@ -164,6 +204,8 @@ Protocol knowledge comes from these community reverse-engineering projects:
 * [pkmn-classic-framework](https://github.com/mm201/pkmn-classic-framework): GTS, Battle Tower, Global Terminal formats
 * [pokeheartgold](https://github.com/ctrl-cheeb-del/pokeheartgold), [pokebw2](https://github.com/fuddlesworth/pokebw2), [aletheia](https://github.com/Project-Holon/aletheia) decompilations: game names, keys, URLs and the gamestats cipher, confirmed against the game code
 * Luigi Auriemma: EncTypeX / GameSpy documentation
+* [NDS-pokemon-mystery-gift-distribution](https://github.com/FreakedOutGamer/NDS-pokemon-mystery-gift-distribution): SSLv3/RC4 stunnel setup tested on real hardware, the HTTP/1.0 requirement, and the certificate recipe
+* [DLS1-Files](https://github.com/InternalLoss/DLS1-Files): Mystery Gift file and listing format
 
 Pokémon and Nintendo DS are trademarks of Nintendo, Creatures Inc. and GAME FREAK.
 This project is not affiliated with them.

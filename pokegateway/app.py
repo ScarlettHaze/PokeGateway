@@ -16,7 +16,7 @@ class WebApp:
         self.state = state          # dict with "gpcm", "registry" for the status page
         self.nas = NAS(db)
         self.gamestats = Gamestats(db)
-        self.dls1 = DLS1(config.dls1_dir)
+        self.dls1 = DLS1(config.dls1_dir, db)
 
     async def __call__(self, req):
         host, path = req.host, req.path
