@@ -1,6 +1,18 @@
 __pycache__/
 *.pyc
 /data/
-/certs/
 /dlc/
-config.ini
+
+# TLS material. Never commit: the Wii NWC certificate/key and anything
+# derived from it, or the generated server keys.
+/certs/
+*.p12
+NWC.crt
+NWC.key
+server.key
+server.crt
+server.csr
+server-chain.crt
+gt5.key
+gt5.crt
+*.srl

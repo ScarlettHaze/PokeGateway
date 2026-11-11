@@ -58,23 +58,26 @@ starts, it logs the IP your DS should use as its DNS server. On the DS
 The DS only supports open or WEP Wi-Fi networks. A DSi or 3DS running a
 DS game has the same limit.
 
-### Docker
+### Docker (one command)
+
+Put your Wii NWC certificate material in `certs/` first (either
+`WII_NWC_1_CERT.p12`, or `NWC.crt` + `NWC.key` — see
+[SSL certificates](#ssl-certificates)), then:
 
 ```bash
-cp config.example.ini config.ini
+./start.sh
 ```
 
-```bash
-mkdir -p certs data dlc
-```
+`start.sh` detects your LAN IP, writes it into `config.ini`, generates the
+TLS certificates (via `deploy/sslproxy/gen-certs.sh`) if they're missing,
+and launches both containers with `docker compose`. It prints the IP to
+enter as your DS's DNS.
 
-```bash
-docker compose up -d --build
-```
-
-The compose file runs PokeGateway and the legacy SSL proxy, both with host
-networking. Host networking is required so that the matchmaking and NAT
-negotiation servers see real client addresses.
+The compose file runs PokeGateway and the SSL proxy with host networking,
+which is required so the matchmaking and NAT negotiation servers see real
+client addresses. To run the steps yourself: `cp config.example.ini
+config.ini`, `bash deploy/sslproxy/gen-certs.sh`, `docker compose up -d
+--build`.
 
 ## SSL certificates
 
@@ -92,36 +95,42 @@ The proxy forwards:
 * `443` to `127.0.0.1:80` (NAS, DLS1, pkvldtprod)
 * `12401` to `127.0.0.1:12411` (Gen 5 Global Terminal)
 
-The build and the forwarding have been tested with an SSLv3/RC4-SHA
-client: NAS login, a Gen 5 Mystery Gift download and a Gen 5 Global
-Terminal request all go through it. They have not been tested with a DS.
+The build, the forwarding and the generated certificates have been tested
+with an SSLv3/RC4-SHA client (not a DS): NAS login, a Gen 5 Mystery Gift
+download and a Gen 5 Global Terminal request all complete, and the
+certificate presented chains `*.*.*` → `Wii NWC Prod 1` → `Nintendo CA`,
+the path a DS trusts.
 
-Put these files in `./certs`:
+The DS has a known flaw, **nds-constrain't**: it doesn't check whether an
+intermediate certificate is allowed to sign others. So a certificate signed
+with the **Wii NWC** client certificate — which Nintendo's CA signed — is
+accepted as if Nintendo issued it. You supply that Wii certificate, and
+`deploy/sslproxy/gen-certs.sh` builds the rest.
 
-* `server-chain.crt` / `server.key`: the certificate the DS checks for
-  NAS/DLS1. The DS has a known flaw ("nds-constrain't"): it doesn't check
-  whether an intermediate certificate may sign others. So a certificate
-  signed with the Wii's NWC client certificate, which Nintendo's CA signed,
-  is accepted. You need that certificate and key, e.g. dumped from your own
-  Wii (`NWC.crt` / `NWC.key`). Then:
-  ```bash
-  openssl genrsa -out certs/server.key 1024
-  ```
-  ```bash
-  openssl req -new -key certs/server.key -subj "/CN=*.*.*" -out certs/server.csr
-  ```
-  ```bash
-  openssl x509 -req -in certs/server.csr -CA NWC.crt -CAkey NWC.key -CAcreateserial -sha1 -days 3650 -out certs/server.crt
-  ```
-  ```bash
-  cat certs/server.crt NWC.crt > certs/server-chain.crt
-  ```
-  The key must be 1024-bit RSA and the signature SHA-1, because the DS
-  supports nothing newer.
-* `gt5.crt` / `gt5.key`: any certificate. The game does not validate it:
-  ```bash
-  openssl req -x509 -newkey rsa:1024 -nodes -days 3650 -subj "/CN=pkgdsprod.nintendo.co.jp" -keyout certs/gt5.key -out certs/gt5.crt
-  ```
+1. Put the Wii NWC material in `certs/`, as **either**:
+   * `WII_NWC_1_CERT.p12` (the PKCS#12 bundle; password `alpine`), **or**
+   * `NWC.crt` and `NWC.key` (PEM).
+
+   Dump it from your own Wii, or use the public bundle the DS preservation
+   community circulates (e.g. in
+   [NDS-pokemon-mystery-gift-distribution](https://github.com/FreakedOutGamer/NDS-pokemon-mystery-gift-distribution/tree/main)).
+   This file is **not** included here and is gitignored so it is never
+   committed.
+
+2. Generate the certificates:
+   ```bash
+   bash deploy/sslproxy/gen-certs.sh
+   ```
+
+This writes `server-chain.crt` + `server.key` (the NAS/DLS1 certificate,
+1024-bit RSA / SHA-1, signed by the Wii NWC cert) and a self-signed
+`gt5.crt` + `gt5.key` for the Gen 5 Global Terminal (which the game does
+not validate). `start.sh` runs this step for you.
+
+The proxy forwards:
+
+* `443` to `127.0.0.1:80` (NAS, DLS1, pkvldtprod)
+* `12401` to `127.0.0.1:12411` (Gen 5 Global Terminal)
 
 If you only want to test without the DS, NAS and DLS1 also answer over
 plain HTTP on port 80.
