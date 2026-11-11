@@ -45,10 +45,26 @@ EOF
     fi
 fi
 
-# 4. Launch.
+# 4. Launch. Use Compose v2 (`docker compose`) if present, else the older
+#    standalone `docker-compose`.
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE="docker-compose"
+else
+    cat >&2 <<EOF
+error: neither 'docker compose' nor 'docker-compose' is available.
+Install Docker Compose:
+  - Docker Desktop includes it, or
+  - macOS:  brew install docker-compose
+Then run ./start.sh again.
+EOF
+    exit 1
+fi
+
 echo
-echo "Starting Docker stack..."
-docker compose up -d --build
+echo "Starting Docker stack with: ${COMPOSE}"
+${COMPOSE} up -d --build
 echo
 echo "PokeGateway is up. On your DS, set both DNS servers to ${SERVER_IP}."
-echo "Follow logs with:  docker compose logs -f"
+echo "Follow logs with:  ${COMPOSE} logs -f"
