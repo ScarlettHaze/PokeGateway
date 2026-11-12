@@ -1,0 +1,1 @@
+tlslite-ng>=0.8.0  # pure-Python SSLv3/RC4 for the DS's HTTPS (optional but needed for login/GTS/Mystery Gift)

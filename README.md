@@ -97,6 +97,9 @@ config.ini`, `bash deploy/sslproxy/gen-certs.sh`, `docker compose up -d
 
 ## SSL certificates
 
+> **PokeGateway now terminates the DS's SSLv3/RC4 connections itself**, in pure Python via `tlslite-ng` (`pip install tlslite-ng`). No stunnel, nginx or Docker proxy is required — everything runs in one process. The `deploy/sslproxy` stunnel image is kept only as a fallback. You still need the login certificate below.
+
+
 The DS logs in over HTTPS (`nas.nintendowifi.net`), downloads Mystery
 Gifts over HTTPS (`dls1.nintendowifi.net`), and Gen 5 opens an SSL
 connection to `pkgdsprod.nintendo.co.jp:12401`. The DS only supports

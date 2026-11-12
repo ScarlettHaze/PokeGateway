@@ -7,7 +7,7 @@ import logging
 import signal
 
 from . import __version__, dns_server, global_terminal, gpcm, gpsp, http_server, \
-    matchmaking, natneg
+    matchmaking, natneg, tls_proxy
 from .app import WebApp
 from .config import load_config
 from .db import Database
@@ -68,6 +68,12 @@ async def run(config):
     if failures:
         log.warning("%d of the services could not start (see errors above); the rest are "
                     "running.", len(failures))
+
+    # Built-in SSLv3/RC4 termination (pure Python). Runs in its own threads,
+    # so no external stunnel/Docker proxy is needed.
+    tls_terminators = tls_proxy.start(config, public_ip)
+    servers.extend(tls_terminators)
+
     log.info("PokeGateway %s ready. Set your DS's primary DNS to %s", __version__, public_ip)
 
     stop = asyncio.Event()

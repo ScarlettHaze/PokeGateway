@@ -53,6 +53,15 @@ class Config:
 
     http_port: int = 80
 
+    # Built-in SSLv3/RC4 TLS termination (pure Python, no external proxy).
+    tls_enabled: bool = True
+    https_port: int = 443           # DS HTTPS (NAS, DLS1, pkvldtprod) -> http_port
+    gt5_tls_port: int = 12401       # DS Gen 5 Global Terminal SSL -> gt5_port
+    tls_cert: str = "certs/server-chain.crt"
+    tls_key: str = "certs/server.key"
+    gt5_cert: str = "certs/gt5.crt"
+    gt5_key: str = "certs/gt5.key"
+
     gpcm_port: int = 29900
     gpsp_port: int = 29901
     qr_port: int = 27900
@@ -118,6 +127,14 @@ def load_config(path=None) -> Config:
         cfg.redirect_domains.extend(extra)
 
     get("http", "port", int, "http_port")
+
+    get("tls", "enabled", bool, "tls_enabled")
+    get("tls", "https_port", int, "https_port")
+    get("tls", "gt5_tls_port", int, "gt5_tls_port")
+    get("tls", "cert", str, "tls_cert")
+    get("tls", "key", str, "tls_key")
+    get("tls", "gt5_cert", str, "gt5_cert")
+    get("tls", "gt5_key", str, "gt5_key")
 
     get("gamespy", "gpcm_port", int)
     get("gamespy", "gpsp_port", int)

@@ -1,5 +1,8 @@
-# Host networking keeps the real client addresses visible to the
-# matchmaking and NAT negotiation servers, which they need.
+# PokeGateway terminates the DS's SSLv3/RC4 connections itself (pure Python),
+# so no separate SSL-proxy container is needed. Host networking keeps the
+# real client addresses visible to the matchmaking and NAT negotiation
+# servers, which they need. (Host networking does not expose ports to the LAN
+# on Docker Desktop / Colima for macOS — on a Mac use ./start-macos.sh.)
 services:
   pokegateway:
     build: .
@@ -8,11 +11,5 @@ services:
     volumes:
       - ./data:/app/data
       - ./dlc:/app/dlc
+      - ./certs:/app/certs:ro
       - ./config.ini:/app/config.ini:ro
-
-  sslproxy:
-    build: deploy/sslproxy
-    network_mode: host
-    restart: unless-stopped
-    volumes:
-      - ./certs:/certs:ro
