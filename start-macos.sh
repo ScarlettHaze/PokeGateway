@@ -48,5 +48,7 @@ echo
 echo "Starting PokeGateway (needs sudo to bind ports 53, 80 and 443)."
 echo "On your DS, set both DNS servers to ${IP}. Press Ctrl-C to stop."
 echo
-# Preserve the pip --user install path for the sudo'd interpreter.
-exec sudo -E "$PY" -m pokegateway -c config.ini
+# sudo runs as root, which doesn't see the user's pip --user packages, so
+# pass the user site-packages path through to the sudo'd interpreter.
+USER_SITE="$("$PY" -c 'import site; print(site.getusersitepackages())' 2>/dev/null || true)"
+exec sudo -E PYTHONPATH="${USER_SITE}${PYTHONPATH:+:$PYTHONPATH}" "$PY" -m pokegateway -c config.ini
