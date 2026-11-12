@@ -80,7 +80,9 @@ class NAS:
             svchost = "external"                                    # Global Link / Game Sync
         else:
             svchost = "n/a"
-        ret = {"returncd": "007", "statusdata": "Y", "svchost": svchost,
+        # returncd 001 (not the Gen 4 convention 007): the Gen 5 game stops
+        # right after svcloc otherwise, for every service type. (Entralinked.)
+        ret = {"returncd": "001", "statusdata": "Y", "svchost": svchost,
                "servicetoken": token}
         return ret
 
