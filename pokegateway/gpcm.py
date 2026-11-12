@@ -64,6 +64,8 @@ class GPCMClient:
         self.last_seen = time.time()
 
     def send(self, data: bytes):
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("GPCM >>> %s", data.decode("latin-1", "replace"))
         try:
             self.writer.write(data)
         except Exception:
@@ -81,9 +83,12 @@ class GPCMClient:
                 buffer += chunk.decode("latin-1")
                 messages, buffer = gs_parse(buffer)
                 for msg in messages:
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug("GPCM <<< %s", {k: v for k, v in msg.items()
+                                                  if k != "__cmd_val__"})
                     handler = getattr(self, "cmd_" + msg["__cmd__"], None)
                     if handler is None:
-                        log.debug("Unhandled GPCM command %s", msg["__cmd__"])
+                        log.info("GPCM: unhandled command %r", msg["__cmd__"])
                         continue
                     handler(msg)
                 await self.writer.drain()
