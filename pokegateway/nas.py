@@ -56,7 +56,11 @@ class NAS:
                 ordered["datetime"] = dt
         if "datetime" not in ordered:
             ordered["datetime"] = dt
-        return Response(200, nas_encode_form(ordered), dict(NAS_HEADERS))
+        # HTTP/1.1: the DWC service-location client rejects an HTTP/1.0 response
+        # as bad data (error 25101). The real NAS server and Entralinked both
+        # answer /ac over HTTP/1.1.
+        return Response(200, nas_encode_form(ordered), dict(NAS_HEADERS),
+                        http_version="1.1")
 
     def acctcreate(self, post, _req):
         if self.db.is_banned(post.get("userid", ""), post.get("macadr", "")):

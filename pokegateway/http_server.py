@@ -60,12 +60,21 @@ class Response:
     status: int = 200
     body: bytes = b""
     headers: dict = field(default_factory=dict)
+    # HTTP version of the status line. Default 1.0: the DS's DLS1 download
+    # client fails on HTTP/1.1. The NAS auth/service-location client, however,
+    # is a separate DWC module (dwc_nas / dwc_svl) that was written against the
+    # real HTTP/1.1 NAS server -- it rejects the service-location response as
+    # "bad data" (error 25101) when it arrives as HTTP/1.0, so NAS responses set
+    # http_version="1.1" explicitly. (Entralinked, which works on hardware,
+    # serves everything as HTTP/1.1 via Jetty.)
+    http_version: str = "1.0"
 
     def encode(self) -> bytes:
         headers = {"Content-Type": "text/plain", **self.headers}
         headers["Content-Length"] = str(len(self.body))
         headers["Connection"] = "close"
-        lines = ["HTTP/1.0 %d %s" % (self.status, REASONS.get(self.status, "Unknown"))]
+        lines = ["HTTP/%s %d %s" % (self.http_version, self.status,
+                                    REASONS.get(self.status, "Unknown"))]
         lines += ["%s: %s" % (k, v) for k, v in headers.items()]
         return ("\r\n".join(lines) + "\r\n\r\n").encode("latin-1") + self.body
 
