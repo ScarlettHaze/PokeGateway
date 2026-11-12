@@ -69,24 +69,19 @@ class NAS:
 
     def svcloc(self, post, req):
         token = self.db.create_authtoken(post)
-        ret = {"retry": "0", "returncd": "007", "statusdata": "Y"}
         svc = post.get("svc", "")
         log.info("NAS svcloc: svc=%s gamecd=%s", svc, post.get("gamecd"))
+        # Minimal response, matching the Entralinked Gen 5 server: no "retry"
+        # and the credential only under "servicetoken" (extra fields appear to
+        # make the Gen 5 game reject the service-location step).
         if svc in ("9000", "9001"):
-            # svc 9000/9001 is the download server (Mystery Gift / DLS1).
-            ret["svchost"] = self.public_host or "dls1.nintendowifi.net"
-            # Provide the credential under both field names: different games
-            # (and generations) read it as "token" or "servicetoken".
-            ret["token"] = token
-            ret["servicetoken"] = token
+            svchost = self.public_host or "dls1.nintendowifi.net"   # DLS1 / Mystery Gift
         elif svc == "0000":
-            # Gen 5 Global Link / Game Sync. The DS resolves this bare name
-            # via DNS (pointed back at us) and talks to /dsio/gw. (Entralinked.)
-            ret["svchost"] = "external"
-            ret["servicetoken"] = token
+            svchost = "external"                                    # Global Link / Game Sync
         else:
-            ret["svchost"] = "n/a"
-            ret["servicetoken"] = token
+            svchost = "n/a"
+        ret = {"returncd": "007", "statusdata": "Y", "svchost": svchost,
+               "servicetoken": token}
         return ret
 
     def profanity(self, post):
