@@ -10,7 +10,7 @@ import hashlib
 import logging
 import time
 
-from .util import gs_b64encode, gs_build, gs_parse, ip_to_int_le, random_str
+from .util import gs_build, gs_parse, ip_to_int_le, random_str
 
 log = logging.getLogger("gpcm")
 
@@ -152,11 +152,14 @@ class GPCMClient:
         self.server.sessions[self.profileid] = self
         proof = login_proof(self.challenge, nas["challenge"], msg.get("challenge", ""),
                             authtoken)
+        # Minimal login response matching the Entralinked Gen 5 server:
+        # userid, profileid, proof, sesskey, id. (No uniquenick/lt, which the
+        # Gen 5 game doesn't expect here.)
         self.send(gs_build(
             "lc", "2",
-            ("sesskey", self.sesskey), ("proof", proof), ("userid", userid),
-            ("profileid", self.profileid), ("uniquenick", profile["uniquenick"]),
-            ("lt", gs_b64encode(random_str(16).encode())), ("id", msg.get("id", "1"))))
+            ("sesskey", self.sesskey), ("userid", userid),
+            ("profileid", self.profileid), ("proof", proof),
+            ("id", msg.get("id", "1"))))
         log.info("Profile %d logged in (userid %s, game %s, %s)", self.profileid, userid,
                  gsbrcd, self.ip)
         for m in self.db.pop_messages(self.profileid):
