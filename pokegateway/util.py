@@ -43,7 +43,11 @@ def nas_encode_form(values: dict) -> bytes:
     parts = []
     for key, value in values.items():
         enc = base64.b64encode(str(value).encode("latin-1")).decode("ascii")
-        parts.append("%s=%s" % (key, enc.replace("=", "*")))
+        # Nintendo's NAS base64 swaps three chars: = -> *, + -> ., / -> -.
+        # (Missing the + and / swaps makes the DS fail to decode tokens that
+        # contain them -> service-location "bad data", error 25101.)
+        enc = enc.replace("=", "*").replace("+", ".").replace("/", "-")
+        parts.append("%s=%s" % (key, enc))
     return ("&".join(parts) + "\r\n").encode("ascii")
 
 
