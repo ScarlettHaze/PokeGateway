@@ -97,6 +97,15 @@ CREATE TABLE IF NOT EXISTS uploads (
     created  INTEGER
 );
 CREATE INDEX IF NOT EXISTS uploads_kind ON uploads(kind, created);
+CREATE TABLE IF NOT EXISTS pgl_players (
+    gsid    TEXT PRIMARY KEY,
+    rom     INTEGER,
+    lang    INTEGER,
+    status  INTEGER DEFAULT 0,   -- 0 awake, 1 sleeping
+    name    TEXT DEFAULT '',
+    data    TEXT DEFAULT '{}',   -- JSON dream data
+    updated INTEGER
+);
 CREATE TABLE IF NOT EXISTS tower (
     gen     INTEGER,
     pid     INTEGER,
@@ -378,6 +387,26 @@ class Database:
         return [dict(r) for r in self.all(
             "SELECT * FROM tower WHERE gen = ? AND rank = ? AND room = ? AND leader = 1 "
             "ORDER BY updated DESC LIMIT ?", (gen, rank, room, count))]
+
+    # ------------------------------------------------------------- Global Link
+    def pgl_get(self, gsid):
+        row = self.one("SELECT * FROM pgl_players WHERE gsid = ?", (gsid,))
+        return dict(row) if row else None
+
+    def pgl_exists(self, gsid):
+        return self.one("SELECT 1 FROM pgl_players WHERE gsid = ?", (gsid,)) is not None
+
+    def pgl_create(self, gsid, rom=None, lang=None):
+        self.q("INSERT OR IGNORE INTO pgl_players (gsid, rom, lang, status, updated) "
+               "VALUES (?, ?, ?, 0, ?)", (gsid, rom, lang, int(time.time())))
+        return self.pgl_get(gsid)
+
+    def pgl_update(self, gsid, **fields):
+        if not fields:
+            return
+        cols = ", ".join("%s = ?" % k for k in fields)
+        args = list(fields.values()) + [int(time.time()), gsid]
+        self.q("UPDATE pgl_players SET %s, updated = ? WHERE gsid = ?" % cols, args)
 
     # ------------------------------------------------------------- stats
     def counts(self):

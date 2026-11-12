@@ -2,11 +2,11 @@
 
 import logging
 
-from . import pgl
 from .dls1 import DLS1
 from .gamestats import Gamestats, pkvldt
 from .http_server import Response
 from .nas import NAS, conntest
+from .pgl import PGL
 
 log = logging.getLogger("app")
 
@@ -18,6 +18,7 @@ class WebApp:
         self.nas = NAS(db)
         self.gamestats = Gamestats(db)
         self.dls1 = DLS1(config.dls1_dir, db)
+        self.pgl = PGL(db)
 
     async def __call__(self, req):
         host, path = req.host, req.path
@@ -32,7 +33,7 @@ class WebApp:
         if path == "/pokemon/validate" or host.startswith("pkvldtprod."):
             return pkvldt(req)
         if path.startswith("/dsio/gw") or host.endswith("pokemon-gl.com") or host == "external":
-            return pgl.handle(req)
+            return self.pgl.handle(req)
         if path == "/":
             return self.status_page()
         return Response(404, b"Not found")

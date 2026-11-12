@@ -124,3 +124,42 @@ def friend_code(profile_id: int, game_id: str) -> int:
 def format_friend_code(fc: int) -> str:
     s = "%012d" % fc
     return "%s-%s-%s" % (s[0:4], s[4:8], s[8:12])
+
+
+# --------------------------------------------------------------------------
+# Pokemon Global Link / Game Sync: Game Sync ID (gsid) encoding.
+# A gsid is a 32-bit number shown to the player as 10 chars from a 32-letter
+# alphabet, with a CRC-16 checksum in the high bits. (From Entralinked.)
+# --------------------------------------------------------------------------
+
+GSID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def crc16(data) -> int:
+    if isinstance(data, int):
+        data = data.to_bytes(4, "little")
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def gsid_stringify(gsid: int) -> str:
+    ugsid = gsid | (crc16(gsid) << 32)
+    return "".join(GSID_ALPHABET[(ugsid >> (5 * i)) & 0x1F] for i in range(10))
+
+
+def gsid_valid(gsid: str) -> bool:
+    if not gsid or len(gsid) != 10:
+        return False
+    ugsid = 0
+    for i, ch in enumerate(gsid):
+        idx = GSID_ALPHABET.find(ch)
+        if idx == -1:
+            return False
+        ugsid |= idx << (5 * i)
+    value = ugsid & 0xFFFFFFFF
+    checksum = (ugsid >> 32) & 0xFFFF
+    return value < 0x80000000 and crc16(value) == checksum

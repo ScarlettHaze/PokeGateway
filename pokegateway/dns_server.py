@@ -75,13 +75,18 @@ class Resolver:
         except ValueError as exc:
             log.debug("Bad query: %s", exc)
             return b""
-        if self.is_ours(qname):
+        catch_all = getattr(self.cfg, "dns_redirect_all", False)
+        if self.is_ours(qname) or catch_all:
             if qtype == QTYPE_A and qclass == QCLASS_IN:
-                log.info("%s -> %s", qname, self.ip)
+                tag = "" if self.is_ours(qname) else " [catch-all]"
+                log.info("%s -> %s%s", qname, self.ip, tag)
                 return build_response(packet, q_end, self.ip, self.cfg.dns_ttl)
             # AAAA / other types for our hosts: empty NOERROR so clients
             # fall back to IPv4.
             return build_response(packet, q_end, None)
+        # Not one of ours and not catching all: log what we're forwarding so
+        # we can see every host the console asks for.
+        log.info("%s -> (forwarded to %s)", qname, self.cfg.dns_upstream)
         return await self.forward(packet, q_end)
 
     async def forward(self, packet: bytes, q_end: int) -> bytes:

@@ -51,6 +51,9 @@ class Config:
     dns_upstream: str = "1.1.1.1"
     dns_upstream_port: int = 53
     dns_ttl: int = 300
+    # Resolve every A query to this server (like Entralinked). A dedicated WFC
+    # DNS wants this so no console request escapes to the real internet.
+    dns_redirect_all: bool = True
     redirect_domains: list = field(default_factory=lambda: list(DEFAULT_REDIRECT_DOMAINS))
 
     http_port: int = 80
@@ -120,6 +123,7 @@ def load_config(path=None) -> Config:
 
     get("dns", "enabled", bool, "dns_enabled")
     get("dns", "port", int, "dns_port")
+    get("dns", "redirect_all", bool, "dns_redirect_all")
     get("dns", "upstream", str, "dns_upstream")
     get("dns", "upstream_port", int, "dns_upstream_port")
     get("dns", "ttl", int, "dns_ttl")
