@@ -43,7 +43,9 @@ class NAS:
                 ret = {"retry": "1", "returncd": "109"}
             else:
                 ret = handler(post, req)
-        ret["datetime"] = time.strftime("%Y%m%d%H%M%S")
+        # 12-char yyMMddHHmmss, the format the DS itself uses (devtime) and
+        # that the Entralinked Gen 5 server returns -- not a 4-digit year.
+        ret["datetime"] = time.strftime("%y%m%d%H%M%S")
         return Response(200, nas_encode_form(ret), dict(NAS_HEADERS))
 
     def acctcreate(self, post, _req):
