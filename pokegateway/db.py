@@ -156,7 +156,10 @@ class Database:
 
     def create_authtoken(self, data: dict) -> str:
         while True:
-            token = "NDS" + secrets.token_urlsafe(60)[:80]
+            # "NDS" + 128 url-safe chars = 131 total, matching the token the
+            # proven-working Entralinked Gen 5 server issues ("NDS" +
+            # secrets.token_urlsafe(96)). Well within DWC_SVL_TOKEN_LENGTH (300).
+            token = "NDS" + secrets.token_urlsafe(96)
             if not self.one("SELECT 1 FROM nas_logins WHERE authtoken = ?", (token,)):
                 break
         self.q("INSERT INTO nas_logins VALUES (?, ?, ?, ?)",

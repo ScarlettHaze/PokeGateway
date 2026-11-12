@@ -48,7 +48,11 @@ def nas_encode_form(values: dict) -> bytes:
         # contain them -> service-location "bad data", error 25101.)
         enc = enc.replace("=", "*").replace("+", ".").replace("/", "-")
         parts.append("%s=%s" % (key, enc))
-    return ("&".join(parts) + "\r\n").encode("ascii")
+    # No trailing newline: the proven-working Entralinked Gen 5 server writes
+    # exactly "&".join(parts) with nothing after it. A trailing "\r\n" lands on
+    # the last field's value and the Gen 5 service-location parser rejects it
+    # (error 25101, SVL BADDATA), even though login tolerates it.
+    return "&".join(parts).encode("ascii")
 
 
 # --------------------------------------------------------------------------

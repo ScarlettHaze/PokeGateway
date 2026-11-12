@@ -9,7 +9,8 @@ from .util import nas_decode_form, nas_encode_form, random_str
 
 log = logging.getLogger("nas")
 
-NAS_HEADERS = {"NODE": "wifiappe1", "Server": "Nintendo Wii (http)"}
+NAS_HEADERS = {"NODE": "wifiappe1", "Server": "Nintendo Wii (http)",
+               "Content-Type": "application/x-www-form-urlencoded"}
 
 CONNTEST_BODY = (b'<html><head><title>HTML Page</title></head>'
                  b'<body bgcolor="#FFFFFF">This is test.html page</body></html>')
@@ -45,8 +46,17 @@ class NAS:
                 ret = handler(post, req)
         # 12-char yyMMddHHmmss, the format the DS itself uses (devtime) and
         # that the Entralinked Gen 5 server returns -- not a 4-digit year.
-        ret["datetime"] = time.strftime("%y%m%d%H%M%S")
-        return Response(200, nas_encode_form(ret), dict(NAS_HEADERS))
+        # It must come right after returncd (2nd field), matching the proven
+        # Entralinked field order: returncd, datetime, then the rest.
+        dt = time.strftime("%y%m%d%H%M%S")
+        ordered = {}
+        for key, value in ret.items():
+            ordered[key] = value
+            if key == "returncd" and "datetime" not in ordered:
+                ordered["datetime"] = dt
+        if "datetime" not in ordered:
+            ordered["datetime"] = dt
+        return Response(200, nas_encode_form(ordered), dict(NAS_HEADERS))
 
     def acctcreate(self, post, _req):
         if self.db.is_banned(post.get("userid", ""), post.get("macadr", "")):
