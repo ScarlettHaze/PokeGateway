@@ -2,6 +2,7 @@
 
 import logging
 
+from . import pgl
 from .dls1 import DLS1
 from .gamestats import Gamestats, pkvldt
 from .http_server import Response
@@ -30,7 +31,9 @@ class WebApp:
             return self.gamestats.handle(req)
         if path == "/pokemon/validate" or host.startswith("pkvldtprod."):
             return pkvldt(req)
-        if path == "/" and not host.endswith("pokemon-gl.com"):
+        if path.startswith("/dsio/gw") or host.endswith("pokemon-gl.com") or host == "external":
+            return pgl.handle(req)
+        if path == "/":
             return self.status_page()
         return Response(404, b"Not found")
 

@@ -79,6 +79,11 @@ class NAS:
             # (and generations) read it as "token" or "servicetoken".
             ret["token"] = token
             ret["servicetoken"] = token
+        elif svc == "0000":
+            # Gen 5 Global Link / Game Sync. The DS resolves this bare name
+            # via DNS (pointed back at us) and talks to /dsio/gw. (Entralinked.)
+            ret["svchost"] = "external"
+            ret["servicetoken"] = token
         else:
             ret["svchost"] = "n/a"
             ret["servicetoken"] = token

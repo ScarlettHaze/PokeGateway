@@ -17,9 +17,11 @@ DEFAULT_REDIRECT_DOMAINS = [
     "gamespy.net",
     "pkgdsprod.nintendo.co.jp",
     "pkvldtprod.nintendo.co.jp",
-    # Gen 5 Game Sync / Global Link (en-ds.pokemon-gl.com etc.). Kept local
-    # so the game gets a clean error instead of reaching a third party.
+    # Gen 5 Game Sync / Global Link (en-ds.pokemon-gl.com etc.).
     "pokemon-gl.com",
+    # The Gen 5 NAS svcloc for svc=0000 returns svchost "external"; the DS
+    # then resolves that bare name, so point it at us too.
+    "external",
 ]
 
 # GameSpy game name -> secret key. Needed by the QR server (heartbeat
