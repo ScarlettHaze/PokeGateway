@@ -29,8 +29,41 @@ BASIC_USER = "pokemon"
 BASIC_PASS = "2Phfv9MY"
 
 
+# Join Avenue / Random Matchup "world battle" (competition) progress states,
+# from DREAM_WORLD_MATCHUP_TYPE in the game source (dreamworld_netdata.h).
+MATCHUP_NONE = 0
+MATCHUP_SIGNUP = 1
+MATCHUP_ENTRY = 2
+MATCHUP_END = 3
+MATCHUP_RETIRE = 4
+ENTRYFLAG_DS_WRITE = 0
+ENTRYFLAG_GPF_WRITE = 1
+
+
 def _status_block(code, extra=b""):
-    return struct.pack("<i", code) + b"\x00" * 124 + extra
+    """The 128-byte `gs_response` header every /dsio/gw body starts with,
+    followed by the response data.
+
+      long  ret_cd      (0 = OK)
+      ulong body_size   (length of the data after the header)
+      ulong start_sec   (server time; 0 is accepted)
+      char  yobi1[8]
+      ushort desc_cd
+      char  desc_msg[80]
+      char  yobi2[25]
+      char  ext_info[1] == 'Z'   (position-check marker the game verifies)
+
+    4+4+4+8+2+80+25+1 = 128 bytes, then `extra`. The game reads the payload at
+    &response[sizeof(gs_response)], i.e. offset 128.
+    """
+    header = struct.pack("<iII", code, len(extra), 0)   # ret_cd, body_size, start_sec
+    header += b"\x00" * 8                                 # yobi1
+    header += struct.pack("<H", 0)                        # desc_cd
+    header += b"\x00" * 80                                # desc_msg
+    header += b"\x00" * 25                                # yobi2
+    header += b"Z"                                        # ext_info (must be 'Z')
+    assert len(header) == 128
+    return header + extra
 
 
 class PGL:
@@ -137,8 +170,25 @@ class PGL:
         # Memory Link (BW -> B2W2). No linked save: report "none".
         return _status_block(NO_ACCOUNT)
 
-    def worldbattle(self, req, gsid, rom, lang):
-        return _status_block(NO_DATA)
+    def worldbattle_download(self, req, gsid, rom, lang):
+        # Random Matchup (rating battles) GETs worldbattle.download before it
+        # will let you battle. The game reads a WORLDBATTLE_STATE_DATA:
+        #   u32 WifiMatchUpID; u8 GPFEntryFlg; u8 WifiMatchUpState; u8 signin; u8 dummy
+        # and in SEQ_CHECK_GPF the ONLY field it checks is `signin`: non-zero ->
+        # proceed to the battle, zero -> "no server" and bail. Report the player
+        # as signed up and entered so rating matchmaking is allowed.
+        state = struct.pack("<IBBBB",
+                            1,                   # WifiMatchUpID (open competition)
+                            ENTRYFLAG_GPF_WRITE, # GPFEntryFlg: written by the server
+                            MATCHUP_ENTRY,       # WifiMatchUpState: entered
+                            1,                   # signin: registered  <-- the gate
+                            0)                   # dummy
+        return _status_block(OK, state)
+
+    def worldbattle_upload(self, req, gsid, rom, lang):
+        # The game POSTs a WORLDBATTLE_SET_DATA to record its entry state; just
+        # acknowledge it.
+        return _status_block(OK)
 
 
 def _int(v):
@@ -161,8 +211,8 @@ ROUTES = {
     "savedata.download": PGL.savedata_download,
     "savedata.download.finish": PGL.savedata_download_finish,
     "savedata.getbw": PGL.savedata_getbw,
-    "worldbattle.upload": PGL.worldbattle,
-    "worldbattle.download": PGL.worldbattle,
+    "worldbattle.upload": PGL.worldbattle_upload,
+    "worldbattle.download": PGL.worldbattle_download,
 }
 
 
